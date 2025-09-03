@@ -4,10 +4,12 @@ import { Appbar, SegmentedButtons, Text, ActivityIndicator, Snackbar, FAB } from
 import { LinearGradient } from 'expo-linear-gradient';
 import { WeatherCard } from '../components/WeatherCard';
 import { LocationConfirmationDialog } from '../components/LocationConfirmationDialog';
+import { LocationSuggestionsList } from '../components/LocationSuggestionsList';
 import { useCurrentLocation, type LocationWithName } from '../hooks/useCurrentLocation';
-import { getCurrentWeatherByCity, getCurrentWeatherByCoords } from '../services/weatherApi';
+import { useLocationSearch } from '../hooks/useLocationSearch';
+import { getCurrentWeatherByCity, getCurrentWeatherByCoords, getCurrentWeatherByLocationSuggestion } from '../services/weatherApi';
 import { LocationStorageService, type StoredLocation } from '../services/locationStorage';
-import type { CurrentWeather } from '../types/weather';
+import type { CurrentWeather, LocationSuggestion } from '../types/weather';
 import { SearchBar } from '../components/SearchBar';
 
 type DisplayMode = 'default' | 'searching' | 'weather';
@@ -24,8 +26,10 @@ export function HomeScreen() {
   const [pendingLocation, setPendingLocation] = useState<LocationWithName | null>(null);
   const [defaultLocation, setDefaultLocation] = useState<StoredLocation | null>(null);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   
   const { getLocation, getLocationWithName, loading: locLoading, error: locError } = useCurrentLocation();
+  const { suggestions, loading: searchLoading, searchLocations, clearSuggestions } = useLocationSearch();
   const mountedRef = useRef(true);
 
   const canSearch = useMemo(() => query.trim().length > 0, [query]);
@@ -127,8 +131,52 @@ export function HomeScreen() {
     await LocationStorageService.markFirstLaunchComplete();
   };
 
+  const handleLocationSelect = useCallback(async (location: LocationSuggestion) => {
+    setQuery(location.name);
+    setShowSuggestions(false);
+    clearSuggestions();
+    setLoading(true);
+    setError(null);
+    setDisplayMode('weather');
+    
+    try {
+      const res = await getCurrentWeatherByLocationSuggestion(location, units);
+      if (mountedRef.current) {
+        setData(res);
+        
+        // Save as new default location
+        const newStoredLocation: StoredLocation = {
+          name: location.name,
+          country: location.country,
+          coordinates: { lat: location.lat, lon: location.lon },
+          isCurrentLocation: false,
+          lastUpdated: new Date()
+        };
+        
+        await LocationStorageService.saveDefaultLocation(newStoredLocation);
+        setDefaultLocation(newStoredLocation);
+      }
+    } catch (e: any) {
+      if (mountedRef.current) {
+        setError(e?.message ?? 'Failed to load weather');
+        setData(null);
+      }
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false);
+      }
+    }
+  }, [units, clearSuggestions]);
+
   const fetchByCity = useCallback(async () => {
     if (!canSearch) return;
+    // If there are suggestions, use the first one
+    if (suggestions.length > 0) {
+      await handleLocationSelect(suggestions[0]);
+      return;
+    }
+    
+    // Fallback to direct city search
     setLoading(true);
     setError(null);
     setDisplayMode('weather');
@@ -160,7 +208,7 @@ export function HomeScreen() {
         setLoading(false);
       }
     }
-  }, [query, units, canSearch]);
+  }, [query, units, canSearch, suggestions, handleLocationSelect]);
 
   const fetchByGps = useCallback(async () => {
     try {
@@ -215,20 +263,23 @@ export function HomeScreen() {
     if (displayMode === 'weather') {
       setDisplayMode('searching');
     }
+    setShowSuggestions(true);
   };
 
   const handleSearchBlur = async () => {
-    if (displayMode === 'searching' && !query.trim()) {
-      setDisplayMode('weather');
-      // If we have a default location but no current weather data, reload it
-      if (defaultLocation && !data) {
-        await fetchWeatherForStoredLocation(defaultLocation);
+    // Delay hiding suggestions to allow for selection
+    setTimeout(() => {
+      setShowSuggestions(false);
+      if (displayMode === 'searching' && !query.trim()) {
+        setDisplayMode('weather');
       }
-    }
+    }, 150);
   };
 
   const handleSearchClear = async () => {
     setQuery('');
+    clearSuggestions();
+    setShowSuggestions(false);
     if (displayMode === 'searching') {
       setDisplayMode('weather');
       // If we have a default location and no current weather data, reload it
@@ -240,13 +291,23 @@ export function HomeScreen() {
 
   const handleQueryChange = async (text: string) => {
     setQuery(text);
-    if (text.trim() && displayMode !== 'searching') {
-      setDisplayMode('searching');
-    } else if (!text.trim() && displayMode === 'searching') {
-      setDisplayMode('weather');
-      // If we have a default location but no current weather data, reload it
-      if (defaultLocation && !data) {
-        await fetchWeatherForStoredLocation(defaultLocation);
+    
+    if (text.trim()) {
+      if (displayMode !== 'searching') {
+        setDisplayMode('searching');
+      }
+      // Search for location suggestions
+      searchLocations(text);
+      setShowSuggestions(true);
+    } else {
+      clearSuggestions();
+      setShowSuggestions(false);
+      if (displayMode === 'searching') {
+        setDisplayMode('weather');
+        // If we have a default location but no current weather data, reload it
+        if (defaultLocation && !data) {
+          await fetchWeatherForStoredLocation(defaultLocation);
+        }
       }
     }
   };
@@ -293,6 +354,14 @@ export function HomeScreen() {
           onFocus={handleSearchFocus}
           onBlur={handleSearchBlur}
           onClear={handleSearchClear}
+          showSuggestions={showSuggestions}
+        />
+
+        <LocationSuggestionsList
+          suggestions={suggestions}
+          loading={searchLoading}
+          onLocationSelect={handleLocationSelect}
+          visible={showSuggestions && (suggestions.length > 0 || searchLoading)}
         />
 
         <View style={styles.controlsRow}>

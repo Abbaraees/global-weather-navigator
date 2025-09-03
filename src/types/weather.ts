@@ -3,6 +3,15 @@ export type Coordinates = {
   lon: number;
 };
 
+export type LocationSuggestion = {
+  name: string;
+  country: string;
+  state?: string;
+  lat: number;
+  lon: number;
+  local_names?: Record<string, string>;
+};
+
 export type CurrentWeather = {
   name: string;
   coord?: {
