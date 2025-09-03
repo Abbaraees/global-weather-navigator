@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
-import { Appbar, SegmentedButtons, Text, Button, ActivityIndicator, Snackbar } from 'react-native-paper';
+import { Appbar, SegmentedButtons, Text, ActivityIndicator, Snackbar, FAB } from 'react-native-paper';
+import { LinearGradient } from 'expo-linear-gradient';
 import { WeatherCard } from '../components/WeatherCard';
 import { useCurrentLocation } from '../hooks/useCurrentLocation';
 import { getCurrentWeatherByCity, getCurrentWeatherByCoords } from '../services/weatherApi';
@@ -55,9 +56,16 @@ export function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <Appbar.Header>
-        <Appbar.Content title="Global Weather Navigator" />
-      </Appbar.Header>
+      <LinearGradient
+        colors={["#0ea5e9", "#22d3ee"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.headerBg}
+      >
+        <Appbar.Header style={{ backgroundColor: 'transparent', elevation: 0 }}>
+          <Appbar.Content title="Global Weather Navigator" color="#ffffff" />
+        </Appbar.Header>
+      </LinearGradient>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <SearchBar value={query} onChangeText={setQuery} onSubmit={fetchByCity} loading={loading} />
@@ -71,9 +79,6 @@ export function HomeScreen() {
               { value: 'imperial', label: '°F', icon: 'temperature-fahrenheit' },
             ]}
           />
-          <Button mode="contained" onPress={fetchByGps} loading={locLoading} style={styles.gpsBtn}>
-            Use GPS
-          </Button>
         </View>
 
         {loading ? (
@@ -86,23 +91,36 @@ export function HomeScreen() {
         {data ? <WeatherCard data={data} units={units} /> : null}
 
         {!data && !loading ? (
-          <Text accessibilityRole="summary" style={{ marginTop: 16, textAlign: 'center' }}>
-            Search for a city or use GPS to view current weather.
-          </Text>
+          <View style={styles.emptyBox}>
+            <Appbar.Action icon="weather-partly-cloudy" color="#94a3b8" />
+            <Text accessibilityRole="summary" style={{ textAlign: 'center', color: '#64748b' }}>
+              Search for a city or tap the GPS button to view your current weather.
+            </Text>
+          </View>
         ) : null}
       </ScrollView>
 
       <Snackbar visible={!!(error || locError)} onDismiss={() => { setError(null); }} duration={4000}>
         {error || locError}
       </Snackbar>
+
+      <FAB
+        icon={locLoading ? 'progress-clock' : 'crosshairs-gps'}
+        onPress={fetchByGps}
+        style={styles.fab}
+        loading={locLoading}
+        accessibilityLabel="Use current location"
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+  headerBg: { paddingBottom: 8 },
   content: { padding: 16 },
   controlsRow: { marginTop: 12, gap: 12 },
   center: { alignItems: 'center', justifyContent: 'center', marginTop: 24 },
-  gpsBtn: { marginTop: 12 },
+  emptyBox: { alignItems: 'center', gap: 8, marginTop: 24 },
+  fab: { position: 'absolute', right: 16, bottom: 24, backgroundColor: '#0ea5e9' },
 });
