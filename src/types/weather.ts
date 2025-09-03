@@ -5,6 +5,10 @@ export type Coordinates = {
 
 export type CurrentWeather = {
   name: string;
+  coord?: {
+    lat: number;
+    lon: number;
+  };
   weather: { id: number; main: string; description: string; icon: string }[];
   main: {
     temp: number;

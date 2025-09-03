@@ -2,13 +2,16 @@ import React from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider as PaperProvider } from 'react-native-paper';
 import { theme } from './src/theme/paper';
-import { HomeScreen } from './src/screens/HomeScreen';
+import { FavoritesProvider } from './src/contexts/FavoritesContext';
+import { MainNavigator } from './src/navigation/MainNavigator';
 
 export default function App() {
   return (
     <PaperProvider theme={theme}>
       <SafeAreaProvider>
-        <HomeScreen />
+        <FavoritesProvider>
+          <MainNavigator />
+        </FavoritesProvider>
       </SafeAreaProvider>
     </PaperProvider>
   );
