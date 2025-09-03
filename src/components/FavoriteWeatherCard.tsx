@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Image, AccessibilityRole } from 'react-native';
-import { Card, Text, Chip, IconButton } from 'react-native-paper';
+import { Card, Text, IconButton, Divider } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FavoriteWeatherData } from '../types/favorites';
 import { useFavorites } from '../contexts/FavoritesContext';
@@ -12,6 +12,8 @@ type Props = {
 
 export function FavoriteWeatherCard({ data, units }: Props) {
   const { removeFavorite } = useFavorites();
+  const [showDetails, setShowDetails] = useState(false);
+  
   const icon = data.weather.weather?.[0]?.icon;
   const iconUrl = icon ? `https://openweathermap.org/img/wn/${icon}@4x.png` : undefined;
   const tempUnit = units === 'metric' ? '°C' : '°F';
@@ -41,70 +43,117 @@ export function FavoriteWeatherCard({ data, units }: Props) {
   };
 
   return (
-    <Card style={{ marginBottom: 12 }}>
+    <Card style={{ marginBottom: 12, elevation: 3, borderRadius: 12 }}>
+      {/* Main Weather Display */}
       <LinearGradient
         colors={["#0ea5e9", "#22d3ee"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={{ padding: 16 }}
+        style={{ 
+          padding: 20, 
+          borderTopLeftRadius: 12, 
+          borderTopRightRadius: 12 
+        }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View style={{ flex: 1 }}>
-            <Text variant="titleMedium" style={{ color: 'white' }}>
+          {/* Location and Temperature */}
+          <View style={{ flex: 1, paddingRight: 16 }}>
+            <Text variant="titleLarge" style={{ color: 'white', fontWeight: '600', marginBottom: 4 }}>
               {data.weather.name}
             </Text>
-            <Text variant="displaySmall" style={{ color: 'white', fontWeight: '700' }}>
-              {Math.round(data.weather.main.temp)}{tempUnit}
+            <Text variant="displaySmall" style={{ color: 'white', fontWeight: '300', lineHeight: 45 }}>
+              {Math.round(data.weather.main.temp)}°
             </Text>
-            <Text style={{ color: 'white', opacity: 0.9 }}>
+            <Text variant="titleMedium" style={{ color: 'white', opacity: 0.9, textTransform: 'capitalize' }}>
               {data.weather.weather?.[0]?.description || ''}
             </Text>
-            <Text style={{ color: 'white', opacity: 0.7, fontSize: 12, marginTop: 4 }}>
+            <Text style={{ color: 'white', opacity: 0.7, fontSize: 12, marginTop: 6 }}>
               Updated {formatLastUpdated(data.lastUpdated)}
             </Text>
           </View>
           
+          {/* Weather Icon and Remove Button */}
           <View style={{ alignItems: 'center' }}>
-            {iconUrl ? (
+            {iconUrl && (
               <Image 
                 accessibilityRole={"image" as AccessibilityRole} 
                 source={{ uri: iconUrl }} 
-                style={{ width: 64, height: 64 }} 
+                style={{ width: 64, height: 64, marginBottom: 8 }} 
               />
-            ) : null}
+            )}
             <IconButton
               icon="star"
               iconColor="white"
               size={20}
               onPress={handleRemoveFavorite}
               accessibilityLabel="Remove from favorites"
-              style={{ marginTop: -8 }}
+              style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
             />
           </View>
         </View>
       </LinearGradient>
       
-      <Card.Content>
-        <View style={{ flexDirection: 'row', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-          <Chip icon="water">Humidity: {data.weather.main.humidity}%</Chip>
-          <Chip icon="weather-windy">Wind: {data.weather.wind.speed} {windUnit}</Chip>
-          {data.weather.main.feels_like != null && (
-            <Chip icon="thermometer">
-              Feels like: {Math.round(data.weather.main.feels_like)}{tempUnit}
-            </Chip>
-          )}
-          {data.weather.sys?.sunrise && (
-            <Chip icon="weather-sunset-up">
-              Sunrise: {timeFmt.format(new Date(data.weather.sys.sunrise * 1000))}
-            </Chip>
-          )}
-          {data.weather.sys?.sunset && (
-            <Chip icon="weather-sunset-down">
-              Sunset: {timeFmt.format(new Date(data.weather.sys.sunset * 1000))}
-            </Chip>
-          )}
+      {/* Quick Stats Row */}
+      <View style={{ 
+        padding: 16, 
+        flexDirection: 'row', 
+        justifyContent: 'space-between',
+        backgroundColor: 'white'
+      }}>
+        <View style={{ alignItems: 'center' }}>
+          <Text variant="bodySmall" style={{ color: '#64748b', marginBottom: 2 }}>Humidity</Text>
+          <Text variant="titleSmall" style={{ fontWeight: '600' }}>{data.weather.main.humidity}%</Text>
         </View>
-      </Card.Content>
+        <View style={{ alignItems: 'center' }}>
+          <Text variant="bodySmall" style={{ color: '#64748b', marginBottom: 2 }}>Wind</Text>
+          <Text variant="titleSmall" style={{ fontWeight: '600' }}>{data.weather.wind.speed} {windUnit}</Text>
+        </View>
+        {data.weather.main.feels_like && (
+          <View style={{ alignItems: 'center' }}>
+            <Text variant="bodySmall" style={{ color: '#64748b', marginBottom: 2 }}>Feels like</Text>
+            <Text variant="titleSmall" style={{ fontWeight: '600' }}>{Math.round(data.weather.main.feels_like)}°</Text>
+          </View>
+        )}
+        <View style={{ alignItems: 'center' }}>
+          <IconButton
+            icon={showDetails ? 'chevron-up' : 'chevron-down'}
+            size={16}
+            onPress={() => setShowDetails(!showDetails)}
+            accessibilityLabel={showDetails ? 'Hide details' : 'Show details'}
+            style={{ margin: 0 }}
+          />
+        </View>
+      </View>
+
+      {/* Expandable Details Section */}
+      {showDetails && (
+        <>
+          <Divider />
+          <View style={{ padding: 16, backgroundColor: '#f8fafc' }}>
+            <Text variant="titleSmall" style={{ marginBottom: 8, fontWeight: '600', color: '#374151' }}>
+              Sun Times
+            </Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
+              {data.weather.sys?.sunrise && (
+                <View style={{ alignItems: 'center' }}>
+                  <Text variant="bodySmall" style={{ color: '#64748b', marginBottom: 2 }}>Sunrise</Text>
+                  <Text variant="bodyMedium" style={{ fontWeight: '500' }}>
+                    {timeFmt.format(new Date(data.weather.sys.sunrise * 1000))}
+                  </Text>
+                </View>
+              )}
+              {data.weather.sys?.sunset && (
+                <View style={{ alignItems: 'center' }}>
+                  <Text variant="bodySmall" style={{ color: '#64748b', marginBottom: 2 }}>Sunset</Text>
+                  <Text variant="bodyMedium" style={{ fontWeight: '500' }}>
+                    {timeFmt.format(new Date(data.weather.sys.sunset * 1000))}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </>
+      )}
     </Card>
   );
 }
